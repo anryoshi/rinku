@@ -11,6 +11,8 @@ use crate::dotfiles::{
 pub use crate::linker_stats::LinkerStats;
 pub use crate::linker_error::LinkerError;
 
+extern crate dirs;
+
 pub fn link_dotfiles(
     mode: Mode,
     root: &path::Path,
@@ -39,7 +41,7 @@ fn link_in_environment(
                 link_to_destination(mode, &source, &dest)
             },
             Target::Platform(platforms) => {
-                if let Some(d) = platforms.get(&environment.to_string()) {
+                if let Some(d) = platforms.get(&environment) {
                     link_to_destination(mode, &source, &d)
                 } else {
                     Ok(LinkerStats::new())
@@ -94,7 +96,10 @@ fn perform_link(
                 eprintln!("WARN: file {} already exists in system", dest.display());
                 return Ok(false)
             }
-            platform_link(source, dest)?
+            let new_dest = expand_dest(dest);
+            create_parent(&new_dest)?;
+            println!("Linking {:?}, {:?}", source, &new_dest);
+            platform_link(source, &new_dest)?
         }
     }
 
@@ -109,6 +114,36 @@ fn os_to_environment(os: &str) -> Option<Environment> {
         "windows" => Some(Environment::Windows),
         _ => None
     }
+}
+
+fn expand_dest(dest: &path::Path) -> path::PathBuf {
+    if dest.starts_with("~/") {
+        let home_dir = dirs::home_dir().unwrap();
+
+        let home_dir_components: Vec<_> = home_dir.components().collect();
+        let start_components = &home_dir_components[..];
+
+        let dest_components: Vec<_> = dest.components().collect();
+        let end_components = &dest_components[1..];
+
+        let new_path_buf: path::PathBuf = [start_components, end_components].concat().iter().collect();
+
+        new_path_buf
+    } else {
+        dest.to_path_buf()
+    }
+}
+
+fn create_parent(dest : &path::Path) -> io::Result<()> {
+    let target_dir = dest.parent().unwrap();
+
+    if !target_dir.exists() {
+        fs::create_dir_all(target_dir)?
+    } else if !target_dir.is_dir() {
+        return Err(io::Error::new(io::ErrorKind::Other, "oh no!"));
+    }
+
+    Ok(())
 }
 
 #[cfg(target_family = "unix")]
