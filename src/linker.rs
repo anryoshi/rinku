@@ -8,8 +8,8 @@ use crate::dotfiles::{
     Environment
 };
 
-pub use crate::linker_stats::LinkerStats;
-pub use crate::linker_error::LinkerError;
+pub use crate::stats::Stats;
+pub use crate::error::Error;
 
 extern crate dirs;
 
@@ -17,11 +17,11 @@ pub fn link_dotfiles(
     mode: Mode,
     root: &path::Path,
     dotfiles: &Dotfiles
-) -> Result<LinkerStats, LinkerError> {
+) -> Result<Stats, Error> {
     let environment = os_to_environment(env::consts::OS);
     match environment {
         Some(env) => link_in_environment(mode, root, dotfiles, env),
-        None => Err(LinkerError::Misc("Unknown environment".to_string()))
+        None => Err(Error::Misc("Unknown environment"))
     }
 }
 
@@ -30,8 +30,8 @@ fn link_in_environment(
     root: &path::Path,
     dotfiles : &Dotfiles,
     environment : Environment
-) -> Result<LinkerStats, LinkerError> {
-    let mut accumulated_stats = LinkerStats::new();
+) -> Result<Stats, Error> {
+    let mut accumulated_stats = Stats::new();
 
     for link in dotfiles.links.iter() {
         let source = path::Path::new(&link.source);
@@ -44,7 +44,7 @@ fn link_in_environment(
                 if let Some(d) = platforms.get(&environment) {
                     link_to_destination(mode, &source, &d)
                 } else {
-                    Ok(LinkerStats::new())
+                    Ok(Stats::new())
                 }
             }
         }?;
@@ -58,10 +58,10 @@ fn link_to_destination(
     mode : Mode,
     source : &path::PathBuf,
     destination : &Destination
-) -> Result<LinkerStats, LinkerError> {
+) -> Result<Stats, Error> {
     fs::metadata(source)?;
     
-    let mut stats = LinkerStats::new();
+    let mut stats = Stats::new();
 
     let mut links_counter = stats.new_item();
     match destination {
@@ -89,7 +89,7 @@ fn perform_link(
     mode: Mode,
     source: &path::Path,
     dest: &path::Path
-) -> Result<bool, LinkerError> {
+) -> Result<bool, Error> {
     match mode {
         Mode::Strict => {
             if fs::metadata(dest).is_ok() {
@@ -100,7 +100,8 @@ fn perform_link(
             create_parent(&new_dest)?;
             println!("Linking {:?}, {:?}", source, &new_dest);
             platform_link(source, &new_dest)?
-        }
+        },
+        _ => {}
     }
 
     Ok(true)

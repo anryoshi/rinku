@@ -1,47 +1,62 @@
 mod dotfiles;
 mod linker;
-mod linker_stats;
-mod linker_error;
+mod stats;
+mod error;
 
 use std::path;
-use structopt::StructOpt;
-use strum_macros::EnumString;
+use clap::{Parser, ArgEnum};
 
 use crate::dotfiles::Dotfiles;
-use crate::linker_error::LinkerError;
+use crate::stats::Stats;
+use crate::error::Error;
 
-#[derive(Copy, Clone, EnumString)]
+#[derive(ArgEnum, Clone, Copy)]
 pub enum Mode {
-    #[strum(serialize = "strict")]
-    Strict
+    /// Fails on the first collision error
+    Strict,
+
+    /// Only prints what will be override
+    Dry,
+
+    /// Override all existing links
+    Force,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Cli {
     dotfile: path::PathBuf,
 
-    #[structopt(short = "m", long = "mode", default_value = "strict")]
+    #[clap(
+        arg_enum,
+        short = 'm',
+        long = "mode",
+        // TODO: Fina a better way to pass default value
+        default_value = "strict"
+    )]
     mode: Mode,
 }
 
-fn main() -> Result<(), LinkerError> {
-    let args = Cli::from_args();
+fn report_stats(stats: &Stats) {
+    println!("Stats: {}", stats);
+}
 
-    let dotfile_path = &args.dotfile.canonicalize()
-        .or_else(|e| Err(LinkerError::Io(e)))?;
+fn perform_linking(args: &Cli) -> Result<(), Error> {
+    let dotfile_path = &args.dotfile.canonicalize()?;
     let dotfile_dir = dotfile_path.parent()
         .ok_or_else(
-            || LinkerError::Misc("Cannot find dotfiles root".to_string()))?;
+            || Error::Misc("Cannot find dotfiles root"))?;
 
-    let content = std::fs::read_to_string(&args.dotfile)
-        .or_else(|e| Err(LinkerError::Io(e)))?;
-
-    let dotfiles: Dotfiles = toml::from_str(&content)
-        .or_else(|e| Err(LinkerError::Parse(e)))?;
+    let content = std::fs::read_to_string(&args.dotfile)?;
+    let dotfiles: Dotfiles = toml::from_str(&content)?;
 
     let stats = linker::link_dotfiles(args.mode, &dotfile_dir, &dotfiles)?;
 
-    println!("[LinkerStats]{}", stats);
+    report_stats(&stats);
 
     Ok(())
+}
+
+fn main() -> Result<(), Error> {
+    let args = Cli::parse();
+    perform_linking(&args)
 }

@@ -1,20 +1,20 @@
 use std::fmt;
 
 #[derive(Debug)]
-pub struct LinkerStats {
+pub struct Stats {
     linked_items : u32,
     links_created: u32
 }
 
-impl LinkerStats {
-    pub fn new() -> LinkerStats {
-        LinkerStats {
+impl Stats {
+    pub fn new() -> Stats {
+        Stats {
             linked_items: 0,
             links_created: 0
         }
     }
 
-    pub fn aggregate(&mut self, other : &LinkerStats) {
+    pub fn aggregate(&mut self, other : &Stats) {
         self.linked_items += other.linked_items;
         self.links_created += other.links_created;
     }
@@ -25,7 +25,7 @@ impl LinkerStats {
     }
 }
 
-impl fmt::Display for LinkerStats {
+impl fmt::Display for Stats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\nitems: {}\nlinks: {}\n", self.linked_items, self.links_created)
     }
