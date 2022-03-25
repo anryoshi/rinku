@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use serde_derive::{Deserialize, Serialize};
 use strum_macros;
 
-#[derive(PartialEq, Eq, Hash, Debug, Deserialize, Serialize, strum_macros::ToString)]
+#[derive(PartialEq, Eq, Hash, Debug, Deserialize, Serialize, strum_macros::Display)]
 pub enum Environment {
     #[strum(serialize = "unix")]
     #[serde(rename = "unix")]

@@ -5,10 +5,10 @@ authors = ["Anton Rybakov <'anryoshi@gmail.com'>"]
 edition = "2021"
 
 [dependencies]
-clap = "3.0.0-beta.5"
+clap = { version = "3.1.6", features = ["derive"] }
 toml = "0.5"
 serde = "1.0"
 serde_derive = "1.0"
-strum = "0.20"
-strum_macros = "0.20"
+strum = "0.24"
+strum_macros = "0.24"
 dirs = "4.0"
