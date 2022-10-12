@@ -4,13 +4,13 @@ mod stats;
 mod error;
 
 use std::path;
-use clap::{Parser, ArgEnum};
+use clap::{Parser, ValueEnum};
 
 use crate::dotfiles::Dotfiles;
 use crate::stats::Stats;
 use crate::error::Error;
 
-#[derive(ArgEnum, Clone, Copy)]
+#[derive(ValueEnum, Clone, Copy)]
 pub enum Mode {
     /// Fails on the first collision error
     Strict,
@@ -26,8 +26,8 @@ pub enum Mode {
 struct Cli {
     dotfile: path::PathBuf,
 
-    #[clap(
-        arg_enum,
+    #[arg(
+        value_enum,
         short = 'm',
         long = "mode",
         // TODO: Fina a better way to pass default value

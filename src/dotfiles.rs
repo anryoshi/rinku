@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use serde_derive::{Deserialize, Serialize};
-use strum_macros;
+use serde::{Deserialize, Serialize};
+use strum::{Display};
 
-#[derive(PartialEq, Eq, Hash, Debug, Deserialize, Serialize, strum_macros::Display)]
+#[derive(PartialEq, Eq, Hash, Debug, Deserialize, Serialize, Display)]
 pub enum Environment {
     #[strum(serialize = "unix")]
     #[serde(rename = "unix")]
