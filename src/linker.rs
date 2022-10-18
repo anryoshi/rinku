@@ -1,8 +1,10 @@
 use std::{io, os, fs, env, path};
 
+use std::str::FromStr;
+
 use crate::Mode;
-use crate::dotfiles::{
-    Dotfiles,
+use crate::linkfile::{
+    Linkfile,
     Destination,
     Target,
     Environment
@@ -13,27 +15,24 @@ pub use crate::error::Error;
 
 extern crate dirs;
 
-pub fn link_dotfiles(
+pub fn ensure_links(
     mode: Mode,
     root: &path::Path,
-    dotfiles: &Dotfiles
+    linkfile: &Linkfile
 ) -> Result<Stats, Error> {
-    let environment = os_to_environment(env::consts::OS);
-    match environment {
-        Some(env) => link_in_environment(mode, root, dotfiles, env),
-        None => Err(Error::Misc("Unknown environment"))
-    }
+    let environment = Environment::from_str(env::consts::FAMILY)?;
+    link_in_environment(mode, root, linkfile, environment)
 }
 
 fn link_in_environment(
     mode: Mode,
     root: &path::Path,
-    dotfiles : &Dotfiles,
+    linkfile : &Linkfile,
     environment : Environment
 ) -> Result<Stats, Error> {
     let mut accumulated_stats = Stats::new();
 
-    for link in dotfiles.links.iter() {
+    for link in linkfile.links.iter() {
         let source = path::Path::new(&link.source);
         let source = root.join(source);
         let stats = match &link.target {
@@ -105,16 +104,6 @@ fn perform_link(
     }
 
     Ok(true)
-}
-
-
-fn os_to_environment(os: &str) -> Option<Environment> {
-    match os {
-        "linux" => Some(Environment::UnixLike),
-        "macos" => Some(Environment::UnixLike),
-        "windows" => Some(Environment::Windows),
-        _ => None
-    }
 }
 
 fn expand_dest(dest: &path::Path) -> path::PathBuf {

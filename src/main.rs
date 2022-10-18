@@ -1,4 +1,4 @@
-mod dotfiles;
+mod linkfile;
 mod linker;
 mod stats;
 mod error;
@@ -6,7 +6,7 @@ mod error;
 use std::path;
 use clap::{Parser, ValueEnum};
 
-use crate::dotfiles::Dotfiles;
+use crate::linkfile::Linkfile;
 use crate::stats::Stats;
 use crate::error::Error;
 
@@ -24,14 +24,13 @@ pub enum Mode {
 
 #[derive(Parser)]
 struct Cli {
-    dotfile: path::PathBuf,
+    linkfile: path::PathBuf,
 
     #[arg(
         value_enum,
         short = 'm',
         long = "mode",
-        // TODO: Fina a better way to pass default value
-        default_value = "strict"
+        default_value_t = Mode::Strict
     )]
     mode: Mode,
 }
@@ -41,15 +40,15 @@ fn report_stats(stats: &Stats) {
 }
 
 fn perform_linking(args: &Cli) -> Result<(), Error> {
-    let dotfile_path = &args.dotfile.canonicalize()?;
-    let dotfile_dir = dotfile_path.parent()
+    let linkfile_path = &args.linkfile.canonicalize()?;
+    let linkfile_dir = linkfile_path.parent()
         .ok_or_else(
-            || Error::Misc("Cannot find dotfiles root"))?;
+            || Error::Misc("Cannot find linkfile root"))?;
 
-    let content = std::fs::read_to_string(&args.dotfile)?;
-    let dotfiles: Dotfiles = toml::from_str(&content)?;
+    let content = std::fs::read_to_string(&args.linkfile)?;
+    let linkfile: Linkfile = toml::from_str(&content)?;
 
-    let stats = linker::link_dotfiles(args.mode, &dotfile_dir, &dotfiles)?;
+    let stats = linker::ensure_links(args.mode, &linkfile_dir, &linkfile)?;
 
     report_stats(&stats);
 
