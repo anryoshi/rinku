@@ -2,19 +2,19 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct Stats {
-    linked_items : u32,
-    links_created: u32
+    linked_items: u32,
+    links_created: u32,
 }
 
 impl Stats {
     pub fn new() -> Stats {
         Stats {
             linked_items: 0,
-            links_created: 0
+            links_created: 0,
         }
     }
 
-    pub fn aggregate(&mut self, other : &Stats) {
+    pub fn aggregate(&mut self, other: &Stats) {
         self.linked_items += other.linked_items;
         self.links_created += other.links_created;
     }
@@ -27,6 +27,10 @@ impl Stats {
 
 impl fmt::Display for Stats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "\nitems: {}\nlinks: {}\n", self.linked_items, self.links_created)
+        write!(
+            f,
+            "\nitems: {}\nlinks: {}\n",
+            self.linked_items, self.links_created
+        )
     }
 }

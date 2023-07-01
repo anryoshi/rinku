@@ -1,12 +1,12 @@
-use std::{io, fmt};
+use std::{fmt, io};
 use strum;
 
 #[derive(Debug)]
 pub enum Error {
+    BadLinkfilePath,
     Io(io::Error),
     TomlParse(toml::de::Error),
     EnumParse(strum::ParseError),
-    Misc(&'static str)
 }
 
 impl From<io::Error> for Error {
@@ -30,10 +30,10 @@ impl From<strum::ParseError> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Error::BadLinkfilePath => write!(f, "Path to linkfile is malformed"),
             Error::Io(err) => write!(f, "IO error occured: {:?}", err),
             Error::TomlParse(err) => write!(f, "TomlParse error occured: {:?}", err),
             Error::EnumParse(err) => write!(f, "EnumParse error occured: {:?}", err),
-            Error::Misc(err) => write!(f,"Misc error occured: {:?}", err)
         }
     }
 }

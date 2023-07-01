@@ -5,8 +5,9 @@ authors = ["Anton Rybakov <'anryoshi@gmail.com'>"]
 edition = "2021"
 
 [dependencies]
-toml = "0.5"
+clap = { version = "4.3", features = ["derive"] }
+dirs = "5.0"
 serde = { version = "1.0", features = ["derive"] }
-strum = { version = "0.24", features = ["derive"] }
-clap = { version = "4.0", features = ["derive"] }
-dirs = "4.0"
+strum = { version = "0.25", features = ["derive"] }
+toml = "0.7"
+colored = "2.0.0"
