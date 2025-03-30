@@ -353,7 +353,7 @@ fn platform_link(source: &Path, dest: &Path) -> io::Result<()> {
 fn platform_link(source: &Path, dest: &Path) -> io::Result<()> {
     create_parent(dest)?;
 
-    if source.is_dir {
+    if source.is_dir() {
         os::windows::fs::symlink_dir(source, dest)
     } else {
         os::windows::fs::symlink_file(source, dest)
