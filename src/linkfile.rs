@@ -28,29 +28,37 @@ pub enum Target {
 pub struct Link {
     pub source: String,
     pub target: Target,
+    pub tag: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Default)]
+pub struct Meta {
+    pub default_tags: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
 pub struct Linkfile {
+    #[serde(rename = "meta", default)]
+    pub meta: Meta,
     #[serde(rename = "link")]
     pub links: Vec<Link>,
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Destination, Environment, Link, Linkfile, Target};
+    use super::{Destination, Environment, Link, Linkfile, Target, Meta};
     use std::collections::HashMap;
 
     #[test]
     fn smoke_linkfile() {
-        const input: &str = r#"
+        const INPUT: &str = r#"
             [[link]]
             source = "somefile"
             target.unix = "target_unix"
             target.windows = "target_windows"
         "#;
 
-        let linkfile: Linkfile = toml::from_str(input).unwrap();
+        let linkfile: Linkfile = toml::from_str(INPUT).unwrap();
 
         assert_eq!(
             linkfile,
@@ -66,8 +74,10 @@ mod tests {
                             Environment::Windows,
                             Destination::Single("target_windows".to_string())
                         )
-                    ]))
-                }]
+                    ])),
+                    tag: None,
+                }],
+                meta: Meta { default_tags: vec![] },
             }
         );
     }

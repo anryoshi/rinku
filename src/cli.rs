@@ -18,13 +18,12 @@ pub enum Mode {
     Force,
 }
 
-/// リンクはオートメーションです
-///
-/// It's dangerous to go alone! Take this...
 #[derive(Parser)]
 pub struct Cli {
+    /// e.g. dotfiles.toml
     pub linkfile: path::PathBuf,
 
+    /// Operation mode
     #[arg(
         value_enum,
         short = 'm',
@@ -32,4 +31,12 @@ pub struct Cli {
         default_value_t = Mode::Dry
     )]
     pub mode: Mode,
+
+    /// Explicitly specified tags
+    #[arg(
+        short = 't',
+        long = "tags",
+        value_delimiter = ','
+    )]
+    pub tags: Vec<String>,
 }

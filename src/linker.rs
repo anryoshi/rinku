@@ -5,11 +5,12 @@ use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, io, os, path};
+use std::collections::HashMap;
 
 use crate::cli::Mode;
 use crate::linkfile::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TargetState {
     Absent,
     AlienNode(Metadata),
@@ -17,7 +18,7 @@ pub enum TargetState {
     Linked(Metadata),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LinkTask {
     pub source: path::PathBuf,
     pub source_metadata: fs::Metadata,
@@ -50,10 +51,18 @@ pub fn do_linkage(
     mode: Mode,
     root: &path::Path,
     linkfile: &Linkfile,
+    tags: &Vec<String>
 ) -> Result<LinkageResult, Error> {
     let environment = Environment::from_str(env::consts::FAMILY)?;
 
-    let mut link_tasks = aggregate_link_tasks(environment, &root, &linkfile.links)?;
+    let active_tags: &Vec<String> =
+        if tags.len() == 0 {
+            &linkfile.meta.default_tags
+        } else {
+            &tags
+        };
+
+    let mut link_tasks = aggregate_link_tasks(environment, &root, &linkfile.links, &active_tags)?;
     link_tasks.sort_by(compare_link_tasks);
 
     Ok(match mode {
@@ -65,8 +74,7 @@ pub fn do_linkage(
 }
 
 fn compare_link_tasks(l: &LinkTask, r: &LinkTask) -> Ordering {
-    // Waiting for Discriminant with Ord trait implemented
-    // (╯°□°）╯︵ ┻━┻
+    // TODO: Figure out correct Discriminant with Ord trait implementation
 
     let l_target_state = &l.target_state;
     let r_target_state = &r.target_state;
@@ -92,26 +100,83 @@ fn compare_link_tasks(l: &LinkTask, r: &LinkTask) -> Ordering {
     }
 }
 
+fn is_link_enabled(link: &Link, tags: &Vec<String>) -> bool {
+    match &link.tag {
+        None => true,
+        Some(tag) => tags.contains(&tag),
+    }
+}
+
+fn collect_all_results<T, E, I>(iter: I) -> Result<Vec<T>, Vec<E>>
+where
+    I: IntoIterator<Item = Result<T, E>>,
+{
+    let mut oks = Vec::new();
+    let mut errs = Vec::new();
+
+    for item in iter {
+        match item {
+            Ok(v) => oks.push(v),
+            Err(e) => errs.push(e),
+        }
+    }
+
+    if errs.is_empty() {
+        Ok(oks)
+    } else {
+        Err(errs)
+    }
+}
+
 fn aggregate_link_tasks(
     environment: Environment,
     root: &path::Path,
     links: &Vec<Link>,
-) -> Result<Vec<LinkTask>, io::Error> {
-    let result: Result<Vec<Vec<LinkTask>>, io::Error> = links
-        .iter()
-        .map(|link| create_link_tasks(environment, root, link))
-        .collect();
+    tags: &Vec<String>,
+) -> Result<Vec<LinkTask>, Error> {
+    let result: Vec<Vec<LinkTask>> = collect_all_results(
+        links
+            .iter()
+            .filter(|link| is_link_enabled(link, &tags))
+            .map(|link| create_link_tasks(environment, root, link)),
+    ).map_err(|e| Error::LinkfileContentError(e))?;
 
-    result.map(|tasks| tasks.into_iter().flatten().collect())
+    let result: Vec<LinkTask> = result.into_iter().flatten().collect();
+
+    let mut dest_sets: HashMap<path::PathBuf, Vec<LinkTask>> = HashMap::new();
+    for linktask in result.into_iter() {
+        dest_sets.entry(linktask.target.clone())
+            .or_insert_with(Vec::new)
+            .push(linktask);
+    }
+
+    let mut correct: Vec<LinkTask> = Vec::new();
+    let mut collision: HashMap<path::PathBuf, Vec<path::PathBuf>> = HashMap::new();
+
+    for (k, mut v) in dest_sets.into_iter() {
+        match v.len() {
+            0 => { panic!("Impossible"); }
+            1 => { correct.push(v.pop().unwrap().clone()); }
+            _ => { collision.insert(k, v.into_iter().map(|e| e.source.clone()).collect()); }
+        }
+    }
+
+    if ! collision.is_empty() {
+        return Err(Error::TargetConflict(collision));
+    }
+
+    Ok(correct)
 }
 
 fn create_link_tasks(
     environment: Environment,
     root: &path::Path,
     link: &Link,
-) -> Result<Vec<LinkTask>, io::Error> {
+) -> Result<Vec<LinkTask>, (path::PathBuf, io::Error)> {
     let source = root.join(path::Path::new(&link.source));
-    let source_metadata = fs::metadata(&source)?;
+
+    let source_metadata = fs::metadata(&source)
+        .map_err(|e| (source.clone(), e))?;
 
     let destination = match &link.target {
         Target::Unified(destination) => destination,
@@ -137,7 +202,8 @@ fn create_link_tasks(
         .into_iter()
         .map(|target| {
             let target = expand_dest(&target);
-            let target_state = examine_target_state(&target, &source)?;
+            let target_state = examine_target_state(&target, &source)
+                .map_err(|e| (target.clone(), e))?;
             Ok(LinkTask {
                 source: source.clone(),
                 source_metadata: source_metadata.clone(),
@@ -152,23 +218,37 @@ fn examine_target_state(target: &path::Path, source: &path::Path) -> io::Result<
     assert!(target.is_absolute());
     assert!(source.is_absolute());
 
-    let target_exists = target.try_exists()?;
+    let target_metadata = match fs::symlink_metadata(target) {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            return Ok(TargetState::Absent);
+        }
+        Err(err) => return Err(err),
+    };
 
-    if !target_exists {
-        return Ok(TargetState::Absent);
+    if !target_metadata.file_type().is_symlink() {
+        return Ok(TargetState::AlienNode(target_metadata));
     }
 
-    if !target.is_symlink() {
-        return Ok(TargetState::AlienNode(target.metadata()?));
-    }
+    let target_destination = fs::read_link(target)?;
 
-    let target_metadata = target.symlink_metadata()?;
-    let target_destination = target.read_link()?;
-    if target_destination != source {
+    let resolved_target_destination = if target_destination.is_absolute() {
+        target_destination
+    } else {
+        let parent = target.parent().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("target path has no parent: {}", target.display()),
+            )
+        })?;
+        parent.join(target_destination)
+    };
+
+    if resolved_target_destination != source {
         return Ok(TargetState::AlienLink(target_metadata));
     }
 
-    return Ok(TargetState::Linked(target_metadata));
+    Ok(TargetState::Linked(target_metadata))
 }
 
 fn dry_link_tasks(linktasks: Vec<LinkTask>) -> LinkageResult {

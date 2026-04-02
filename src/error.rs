@@ -1,18 +1,16 @@
 use std::{fmt, io};
 use strum;
+use std::collections::HashMap;
+use std::path;
 
 #[derive(Debug)]
 pub enum Error {
     BadLinkfilePath,
-    Io(io::Error),
+    BadLinkfile(io::Error),
     TomlParse(toml::de::Error),
     EnumParse(strum::ParseError),
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Error::Io(e)
-    }
+    LinkfileContentError(Vec<(path::PathBuf, io::Error)>),
+    TargetConflict(HashMap<path::PathBuf, Vec<path::PathBuf>>)
 }
 
 impl From<toml::de::Error> for Error {
@@ -30,10 +28,18 @@ impl From<strum::ParseError> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::BadLinkfilePath => write!(f, "Path to linkfile is malformed"),
-            Error::Io(err) => write!(f, "IO error occured: {:?}", err),
-            Error::TomlParse(err) => write!(f, "TomlParse error occured: {:?}", err),
-            Error::EnumParse(err) => write!(f, "EnumParse error occured: {:?}", err),
+            Error::BadLinkfilePath => write!(f, "Path to linkfile is malformed\n"),
+            Error::BadLinkfile(err) => write!(f, "IO error during linkfile processing: {:?}\n", err),
+            Error::TomlParse(err) => write!(f, "TomlParse error occured:\n{}\n", err),
+            Error::EnumParse(err) => write!(f, "EnumParse error occured: {:?}\n", err),
+            Error::LinkfileContentError(errs) => {
+                write!(f, "IO errors occured:\n")?;
+                for (path, err) in errs {
+                    write!(f, "{}:\t{}\n", path.display(), err)?;
+                }
+                Ok(())
+            }
+            Error::TargetConflict(err) => write!(f, "TargetConflict error occured: {:?}\n", err),
         }
     }
 }
